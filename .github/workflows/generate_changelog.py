@@ -26,7 +26,7 @@ jobs:
 
       - name: Generate Changelog
         run: |
-          python <<EOF
+          cat << 'EOF' > generate_changelog.py
 import subprocess
 import os
 import datetime
@@ -64,6 +64,7 @@ with open(changelog_file, 'w') as f:
 
 print(f'Changelog generated and saved to {changelog_file}')
 EOF
+          python generate_changelog.py
 
       - name: Commit and Push if changes exist
         run: |
