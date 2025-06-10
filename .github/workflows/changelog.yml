@@ -117,7 +117,7 @@ print(f'Changelog generated and saved to {changelog_file}')
           git diff --staged --quiet || git commit -m "chore(changelog): Update CHANGELOG.md"
 
           # Push the changes to the repository
-          # CHANGELOG_TOKEN provides the necessary authentication
+          # GITHUB_TOKEN provides the necessary authentication
           git push
         env:
-          CHANGELOG_TOKEN: ${{ secrets.CHANGELOG_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
