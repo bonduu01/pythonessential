@@ -19,7 +19,9 @@ jobs:
         uses: mikepenz/release-changelog-builder-action@v3
         id: changelog
         with:
+          fail_if_no_releases: false  # Add this to prevent failure when no tags exist
           configuration: |
+            untagged: "Unreleased Changes"  # Add this to group untagged commits
             categories:
               - title: "🚀 Features"
                 labels:
@@ -62,7 +64,10 @@ jobs:
                   {{/each}}
                 {{/each}}
               {{else}}
-                No releases yet.
+                ## Unreleased Changes
+                {{#each commits}}
+                  - {{subject}} ([{{sha}}]({{href}})) by **{{author}}**
+                {{/each}}
               {{/if}}
 
       - name: Save Changelog to File
