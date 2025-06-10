@@ -26,7 +26,7 @@ jobs:
 
       - name: Generate Changelog
         run: |
-          python -c "
+          python <<EOF
 import subprocess
 import os
 import datetime
@@ -63,18 +63,16 @@ with open(changelog_file, 'w') as f:
     f.write(final_content)
 
 print(f'Changelog generated and saved to {changelog_file}')
-"
+EOF
 
       - name: Commit and Push if changes exist
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Fix: Define changelog_file variable in bash context
           changelog_file="CHANGELOG.md"
           git add "$changelog_file"
           
-          # Check if there are changes before committing
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
