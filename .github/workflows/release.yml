@@ -3,7 +3,10 @@ name: Release Automation
 on:
   push:
     tags:
-      - 'v*' # Trigger on version tags (e.g., v1.0.0)
+      - 'v*'
+
+permissions:
+  contents: write
 
 jobs:
   create-release:
@@ -12,45 +15,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Needed for git history
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install git-changelog
-
       - name: Generate changelog
-        id: changelog
         run: |
+          pip install git-changelog
           git-changelog -o CHANGELOG.md --template angular
-          CHANGELOG=$(cat CHANGELOG.md)
-          echo "CHANGELOG<<EOF" >> $GITHUB_ENV
-          echo "$CHANGELOG" >> $GITHUB_ENV
+          echo "CHANGELOG_CONTENT<<EOF" >> $GITHUB_ENV
+          cat CHANGELOG.md >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref_name }}
-          body: ${{ env.CHANGELOG }}
-          draft: false
-          prerelease: false
-
-      - name: Upload CHANGELOG.md as asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./CHANGELOG.md
-          asset_name: CHANGELOG.md
-          asset_content_type: text/plain
+          name: ${{ github.ref_name }}
+          body: ${{ env.CHANGELOG_CONTENT }}
+          files: CHANGELOG.md
