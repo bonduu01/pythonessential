@@ -2,21 +2,32 @@ name: Version Bumper
 
 on:
   push:
-    branches: [ main, master ]  # Add both common default branch names
+    branches: [ main ]
 
 jobs:
   bump-version:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Required to get full git history
 
-      # Use the correct action version (v5.2 is latest as of 2023)
-      - name: Bump version and create tag
-        uses: mathieudutour/github-tag-action@v5.2
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          tag_prefix: "v"
-          default_bump: patch
-          with_v: false  # Set to true if you want tags like "v1.0.0" (recommended)
+          python-version: '3.x'
+
+      - name: Install bump2version
+        run: pip install bump2version
+
+      - name: Bump version
+        run: |
+          bump2version patch  # or minor/major
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git commit -am "Bump version"
+          git push
+
+      - name: Create tag
+        run: |
+          VERSION=$(cat .bumpversion.cfg | grep current_version | awk '{print $3}')
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
