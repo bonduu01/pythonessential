@@ -4,11 +4,16 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: write  # Required to push version changes and tags
+
 jobs:
   bump-version:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for full git history
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -18,15 +23,43 @@ jobs:
       - name: Install bump2version
         run: pip install bump2version
 
-      - name: Bump version
+      - name: Configure Git
         run: |
-          bump2version patch  # or minor/major
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git commit -am "Bump version"
+
+      - name: Bump version
+        run: |
+          # First check if .bumpversion.cfg exists
+          if [ ! -f .bumpversion.cfg ]; then
+            echo "Creating initial .bumpversion.cfg"
+            cat > .bumpversion.cfg <<EOL
+            [bumpversion]
+            current_version = 0.1.0
+            commit = True
+            tag = False
+            
+            [bumpversion:file:version.txt]
+            EOL
+          fi
+          
+          # Get current version
+          CURRENT_VERSION=$(bump2version --dry-run --list patch | grep current_version | sed -r s,"^.*=",,)
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Bump version
+          bump2version --verbose patch
+          
+          # Get new version
+          NEW_VERSION=$(bump2version --dry-run --list patch | grep current_version | sed -r s,"^.*=",,)
+          echo "New version: $NEW_VERSION"
+
+      - name: Push version changes
+        run: |
+          git commit -am "Bump version to $(cat .bumpversion.cfg | grep current_version | awk '{print $3}')"
           git push
 
-      - name: Create tag
+      - name: Create and push tag
         run: |
           VERSION=$(cat .bumpversion.cfg | grep current_version | awk '{print $3}')
           git tag "v$VERSION"
