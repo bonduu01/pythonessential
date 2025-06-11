@@ -1,154 +1,56 @@
-# Name of the workflow as it appears in the GitHub Actions UI
-name: Generate Changelog
+name: Release Automation
 
-# Define when the workflow should run
 on:
   push:
-    branches:
-      - main # Trigger on pushes to the 'main' branch (adjust if your primary branch is 'master')
-  workflow_dispatch: # Allows you to manually trigger the workflow from the GitHub UI
+    tags:
+      - 'v*' # Trigger on version tags (e.g., v1.0.0)
 
-# Permissions needed for this workflow to function
-# 'contents: write' is essential for the action to be able to commit the updated CHANGELOG.md file back to the repository
-permissions:
-  contents: write
-
-# Define the jobs to be executed in this workflow
 jobs:
-  generate_and_commit_changelog:
-    # Specify the runner environment for this job
+  create-release:
     runs-on: ubuntu-latest
-
-    # Steps involved in the job
     steps:
       - name: Checkout code
-        # Uses the official 'actions/checkout' action to clone your repository
-        # fetch-depth: 0 ensures that the entire commit history is fetched, which is necessary for changelog generation
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Needed for git history
 
-      - name: Set up Python
-        # Uses the official 'actions/setup-python' action to set up Python on the runner
-        uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.x' # Use the latest available Python 3 version
+          python-version: '3.x'
 
-      - name: Generate Changelog Content
-        # This step executes an inline Python script to generate the changelog content
-        id: generate_content # Add an ID to easily reference its outputs later
+      - name: Install dependencies
         run: |
-          python -c "
-              import subprocess
-              import os
-              import datetime
-              
-              # Define the name of the changelog file
-              changelog_file = 'CHANGELOG.md'
-              
-              # Create the header for the new changelog entries, including the current date
-              new_changelog_header = f'## Changes ({datetime.date.today()})\n\n'
-              new_changelog_entries = []
-              
-              try:
-                  # Attempt to find the latest tag to get commits since the last release
-                  # This requires 'git describe' to work, which means there must be at least one tag.
-                  try:
-                      # Get the latest tag. `--tags` includes annotated and lightweight tags.
-                      # `--abbrev=0` only shows the tag name.
-                      # stderr=subprocess.DEVNULL suppresses the 'No names found' error from git describe
-                      latest_tag_result = subprocess.run(
-                          ['git', 'describe', '--tags', '--abbrev=0', 'HEAD'],
-                          capture_output=True, text=True, check=False, stderr=subprocess.DEVNULL
-                      )
-                      if latest_tag_result.returncode == 0:
-                          latest_tag = latest_tag_result.stdout.strip()
-                          # If a tag is found, get commits from the tag + 1 commit up to HEAD
-                          # Using 'latest_tag + '..HEAD' to get commits since that tag
-                          git_log_command = ['git', 'log', '--pretty=format:%h - %an (%ad): %s', '--date=short', f'{latest_tag}..HEAD']
-                          print(f'Fetching commits since tag: {latest_tag}')
-                      else:
-                          # If no tags are found (git describe returns non-zero), fall back to the last N commits
-                          print('No Git tags found in history. Fetching last 50 commits.')
-                          git_log_command = ['git', 'log', '--pretty=format:%h - %an (%ad): %s', '--date=short', '-n', '50']
-              
-                  except Exception as e:
-                      # Catch any other potential errors during git describe and fall back
-                      print(f'Warning: Error during git describe ({e}). Falling back to last 50 commits.')
-                      git_log_command = ['git', 'log', '--pretty=format:%h - %an (%ad): %s', '--date=short', '-n', '50']
-              
-                  # Execute the chosen git log command
-                  result = subprocess.run(git_log_command, capture_output=True, text=True, check=True)
-                  commits = result.stdout.strip().split('\n')
-              
-                  # Filter out empty lines and format each commit as a Markdown list item
-                  for commit in commits:
-                      if commit: # Ensure commit line is not empty
-                          new_changelog_entries.append(f'* {commit}')
-              
-              except subprocess.CalledProcessError as e:
-                  print(f'Error running git log: {e}')
-                  print(e.stderr)
-                  exit(1) # Fail the step if git log itself fails
-              
-              # Combine header and entries
-              new_changelog_content_block = new_changelog_header + '\n'.join(new_changelog_entries) + '\n'
-              
-              # Read existing changelog content if the file already exists
-              existing_full_changelog = ''
-              if os.path.exists(changelog_file):
-                  with open(changelog_file, 'r') as f:
-                      existing_full_changelog = f.read()
-              
-              # Prepend the new changelog content to the existing content
-              # The main header is retained, and new changes are added right below it.
-              # If the file was empty or didn't exist, new_changelog_content becomes the full content.
-              if existing_full_changelog.startswith('# Changelog'):
-                  # Find the position to insert new content after the main header
-                  # Assumes the main header is "# Changelog" followed by two newlines
-                  insert_pos = existing_full_changelog.find('\n\n') + 2
-                  final_content = existing_full_changelog[:insert_pos] + new_changelog_content_block + '\n' + existing_full_changelog[insert_pos:]
-              else:
-                  # If no main header, add one and then the new content followed by any existing content
-                  final_content = f'# Changelog\n\n' + new_changelog_content_block + '\n' + existing_full_changelog.strip() + '\n' # Ensure consistent newlines
-              
-              # Write the combined content to a temporary file
-              # This allows 'Commit and Push' step to read from it directly
-              temp_changelog_path = os.path.join(os.environ.get('RUNNER_TEMP', '/tmp'), 'temp_CHANGELOG.md')
-              with open(temp_changelog_path, 'w') as f:
-                  f.write(final_content)
-              
-              print(f'Changelog content generated to temporary file: {temp_changelog_path}')
-              # Set the path to the temporary file as an output of this step
-              # This makes it accessible to subsequent steps via steps.generate_content.outputs.changelog_path
-              print(f'::set-output name=changelog_path::{temp_changelog_path}')
-              "
-              
-                    - name: Copy Generated Changelog to Repository
-                      # Copy the content from the temporary file to the actual CHANGELOG.md in the repo
-                      run: cp ${{ steps.generate_content.outputs.changelog_path }} CHANGELOG.md
-              
-                    - name: Commit and Push if changes exist
-                      # This step commits the updated CHANGELOG.md file back to the repository
-                      # It only commits if there are actual changes to avoid empty commits
-                      run: |
-                        # Configure Git user for the commit
-                        git config user.name "github-actions[bot]"
-                        git config user.email "github-actions[bot]@users.noreply.github.com"
-              
-                        # Stage the changelog file
-                        git add CHANGELOG.md
-              
-                        # Check if there are any changes staged for commit. If there are, then commit.
-                        if git diff --staged --quiet; then
-                          echo "No changes to CHANGELOG.md. Skipping commit."
-                        else
-                          git commit -m "chore(changelog): Update CHANGELOG.md"
-                          # Push the changes to the repository
-                          # GITHUB_TOKEN provides the necessary authentication (ensure 'contents: write' permission is set)
-                          git push
-                          echo "CHANGELOG.md committed and pushed."
-                        fi
-                      env:
-                        # Use the default GITHUB_TOKEN provided by GitHub Actions for repository interactions
-                        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          python -m pip install --upgrade pip
+          pip install git-changelog
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          git-changelog -o CHANGELOG.md --template angular
+          CHANGELOG=$(cat CHANGELOG.md)
+          echo "CHANGELOG<<EOF" >> $GITHUB_ENV
+          echo "$CHANGELOG" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref_name }}
+          body: ${{ env.CHANGELOG }}
+          draft: false
+          prerelease: false
+
+      - name: Upload CHANGELOG.md as asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./CHANGELOG.md
+          asset_name: CHANGELOG.md
+          asset_content_type: text/plain
