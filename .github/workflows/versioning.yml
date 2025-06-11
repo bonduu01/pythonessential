@@ -30,29 +30,22 @@ jobs:
 
       - name: Bump version
         run: |
-          # First check if .bumpversion.cfg exists
-          if [ ! -f .bumpversion.cfg ]; then
-            echo "Creating initial .bumpversion.cfg"
-            cat > .bumpversion.cfg <<EOL
-            [bumpversion]
-            current_version = 0.1.0
-            commit = True
-            tag = False
-            
-            [bumpversion:file:version.txt]
-            EOL
-          fi
-          
-          # Get current version
-          CURRENT_VERSION=$(bump2version --dry-run --list patch | grep current_version | sed -r s,"^.*=",,)
+          # Read current version
+          CURRENT_VERSION=$(cat version.txt)
           echo "Current version: $CURRENT_VERSION"
           
-          # Bump version
-          bump2version --verbose patch
-          
-          # Get new version
-          NEW_VERSION=$(bump2version --dry-run --list patch | grep current_version | sed -r s,"^.*=",,)
+          # Bump patch version
+          IFS='.' read -ra VERSION <<< "$CURRENT_VERSION"
+          NEW_VERSION="${VERSION[0]}.${VERSION[1]}.$((VERSION[2]+1))"
           echo "New version: $NEW_VERSION"
+          
+          # Update version file
+          echo "$NEW_VERSION" > version.txt
+          
+          # Update .bumpversion.cfg if exists
+          if [ -f .bumpversion.cfg ]; then
+            sed -i "s/current_version = .*/current_version = $NEW_VERSION/" .bumpversion.cfg
+          fi
 
       - name: Push version changes
         run: |
