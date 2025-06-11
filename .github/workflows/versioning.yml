@@ -2,16 +2,21 @@ name: Version Bumper
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]  # Add both common default branch names
 
 jobs:
   bump-version:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Bump version
-        uses: mathieudutour/github-tag-action@v6
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required to get full git history
+
+      # Use the correct action version (v5.2 is latest as of 2023)
+      - name: Bump version and create tag
+        uses: mathieudutour/github-tag-action@v5.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag_prefix: "v"
           default_bump: patch
+          with_v: false  # Set to true if you want tags like "v1.0.0" (recommended)
