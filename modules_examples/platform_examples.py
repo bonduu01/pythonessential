@@ -2,11 +2,9 @@
  version information."""
 
 from platform import platform, machine, processor, system, version
-import os
 
 print(platform())
 print(platform(False, False))
-print(platform(0, 1))
 
 
 # Print Machine Name
