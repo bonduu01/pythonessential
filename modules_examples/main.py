@@ -5,3 +5,5 @@ ones = [1 for i in range(5)]
 
 print(sum_l(zeroes))
 print(prod_l(ones))
+
+assert var == 0
