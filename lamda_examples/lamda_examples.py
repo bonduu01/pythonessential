@@ -1,4 +1,5 @@
 two = lambda: 2
+help(two)
 sqr = lambda x: x * x
 pwr = lambda x, y: x ** y
 
